@@ -62,8 +62,8 @@ export default function HomePage() {
               <Image
                 src="/uni.gif"
                 alt="UniPool Illustration"
-                layout="fill"
-                objectFit="contain"
+                fill
+                style={{ objectFit: 'contain' }}
                 className="rounded-2xl"
                 unoptimized
               />
