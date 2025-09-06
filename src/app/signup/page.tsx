@@ -26,7 +26,7 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/signup`, form);
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/signup`, form);
       setSuccess("Account created successfully! Redirecting to login...");
       setTimeout(() => {
         window.location.href = "/login";
