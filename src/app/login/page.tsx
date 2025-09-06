@@ -106,7 +106,7 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-8 text-center text-gray-500 text-sm">
-          Don't have an account?{" "}
+          Don&apos;t have an account?{" "}
           <span
             onClick={() => {
               window.location.href = "/signup";

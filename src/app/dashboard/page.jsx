@@ -287,7 +287,7 @@ export default function Dashboard() {
                   </div>
                 ))
               ) : (
-                <p className="text-gray-500">You haven't created any rides yet.</p>
+                <p className="text-gray-500">You haven&apos;t created any rides yet.</p>
               )}
             </div>
           </section>
@@ -311,7 +311,7 @@ export default function Dashboard() {
                   </div>
                 ))
               ) : (
-                <p className="text-gray-500">You haven't booked any rides yet.</p>
+                <p className="text-gray-500">You haven&apos;t booked any rides yet.</p>
               )}
             </div>
           </section>
@@ -420,7 +420,7 @@ export default function Dashboard() {
                 <div>
                     <h2 className="text-3xl font-bold text-gray-800 mb-6">OBD Mock Data</h2>
                     <p className="text-gray-600 mb-4">
-                        Simulate real-time data from a vehicle's On-Board Diagnostics system.
+                        Simulate real-time data from a vehicle&apos;s On-Board Diagnostics system.
                         <br />
                         <span className="text-sm text-gray-500">
                             This generates mock sensor data (speed, RPM, fuel level, GPS) for testing.
