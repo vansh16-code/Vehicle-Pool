@@ -75,7 +75,7 @@ def login(request, data: LoginSchema):
     if user is None:
         raise HttpError(400, "Invalid credentials")
 
-    refresh = RefreshToken.for_user(user)
+    refresh = RefreshToken.for_user(user)  
     return {
         "access": str(refresh.access_token),
         "refresh": str(refresh),
@@ -174,7 +174,7 @@ def my_bookings(request):
 
 from datetime import timedelta
 from django.utils.timezone import now
-# ... rest of imports
+
 
 # =====================
 # CANCEL BOOKING ROUTE
