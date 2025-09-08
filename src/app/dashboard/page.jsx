@@ -8,16 +8,26 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
-  const [rides, setRides] = useState([]);
-  const [myRides, setMyRides] = useState([]);
-  const [myBookings, setMyBookings] = useState([]);
-  const [newRideForm, setNewRideForm] = useState({
-    source: "",
-    destination: "",
-    departure_time: "",
-    fare: "",
-    available_seats: "",
+  const [vehicles, setVehicles] = useState([]);
+  const [availableVehicles, setAvailableVehicles] = useState([]);
+  const [myVehicleAvailability, setMyVehicleAvailability] = useState([]);
+  const [myVehicleBookings, setMyVehicleBookings] = useState([]);
+  const [newVehicleForm, setNewVehicleForm] = useState({
+    name: "",
+    registration_number: "",
+    price_per_hour: "",
+    available_from: "",
+    available_to: "",
   });
+  const [newAvailabilityForm, setNewAvailabilityForm] = useState({
+    vehicle_id: "",
+    pickup_point: "",
+    available_from: "",
+    available_to: "",
+    price_per_hour: "",
+  });
+  const [showLiabilityModal, setShowLiabilityModal] = useState(false);
+  const [selectedAvailability, setSelectedAvailability] = useState(null);
   const [chatQuery, setChatQuery] = useState("");
   const [chatMessages, setChatMessages] = useState([]);
   const [obdVehicleId, setObdVehicleId] = useState("");
@@ -44,20 +54,23 @@ export default function Dashboard() {
       // 2. Fetch data from various endpoints concurrently
       const [
         userRes,
-        ridesRes,
-        myRidesRes,
+        vehiclesRes,
+        availableVehiclesRes,
+        myAvailabilityRes,
         myBookingsRes,
       ] = await Promise.all([
-        axios.get(`${API_URL}/api/me`), // Corresponds to the "/me" endpoint
-        axios.get(`${API_URL}/api/rides`), // Corresponds to the "/rides" endpoint
-        axios.get(`${API_URL}/api/my-rides`), // Corresponds to the "/my-rides" endpoint
-        axios.get(`${API_URL}/api/my-bookings`), // Corresponds to the "/my-bookings" endpoint
+        axios.get(`${API_URL}/api/me`),
+        axios.get(`${API_URL}/api/vehicles`),
+        axios.get(`${API_URL}/api/vehicle-availability`),
+        axios.get(`${API_URL}/api/my-vehicle-availability`),
+        axios.get(`${API_URL}/api/my-vehicle-bookings`),
       ]);
 
       setUser(userRes.data);
-      setRides(ridesRes.data);
-      setMyRides(myRidesRes.data);
-      setMyBookings(myBookingsRes.data);
+      setVehicles(vehiclesRes.data);
+      setAvailableVehicles(availableVehiclesRes.data);
+      setMyVehicleAvailability(myAvailabilityRes.data);
+      setMyVehicleBookings(myBookingsRes.data);
       setError("");
     } catch (err) {
       console.error(err);
@@ -67,57 +80,76 @@ export default function Dashboard() {
     }
   };
 
-  const handleCreateRide = async (e) => {
+  const handleCreateVehicle = async (e) => {
     e.preventDefault();
     try {
-      // 3. Create a new ride via the "POST /rides" endpoint
-      await axios.post(`${API_URL}/api/rides`, newRideForm);
-      setNewRideForm({
-        source: "",
-        destination: "",
-        departure_time: "",
-        fare: "",
-        available_seats: "",
+      await axios.post(`${API_URL}/api/vehicles`, newVehicleForm);
+      setNewVehicleForm({
+        name: "",
+        registration_number: "",
+        price_per_hour: "",
+        available_from: "",
+        available_to: "",
       });
-      fetchData(); // Refresh data after creating
+      fetchData();
+      setError("Vehicle created successfully!");
     } catch (err) {
-      setError("Failed to create ride.");
+      setError(err.response?.data?.detail || "Failed to create vehicle.");
     }
   };
 
-  const handleBookRide = async (rideId) => {
+  const handleCreateAvailability = async (e) => {
+    e.preventDefault();
     try {
-      // 4. Book a ride using "POST /rides/{ride_id}/book"
-      await axios.post(`${API_URL}/api/rides/${rideId}/book`);
-      fetchData(); // Refresh data
-      setError("Ride booked successfully!");
+      await axios.post(`${API_URL}/api/vehicle-availability`, newAvailabilityForm);
+      setNewAvailabilityForm({
+        vehicle_id: "",
+        pickup_point: "",
+        available_from: "",
+        available_to: "",
+        price_per_hour: "",
+      });
+      fetchData();
+      setError("Vehicle availability posted successfully!");
     } catch (err) {
-      setError(err.response?.data?.detail || "Failed to book ride.");
+      setError(err.response?.data?.detail || "Failed to post vehicle availability.");
     }
   };
 
-  const handleCancelBooking = async (bookingId) => {
+  const handleBookVehicle = (availability) => {
+    setSelectedAvailability(availability);
+    setShowLiabilityModal(true);
+  };
+
+  const handleAcceptLiability = async () => {
+    if (!selectedAvailability) return;
+    
     try {
-      // 5. Cancel a booking using "DELETE /bookings/{booking_id}/cancel"
-      await axios.delete(`${API_URL}/api/bookings/${bookingId}/cancel`);
-      fetchData(); // Refresh data
-      setError("Booking cancelled successfully!");
+      await axios.post(`${API_URL}/api/vehicle-booking`, {
+        availability_id: selectedAvailability.id,
+        liability_accepted: true
+      });
+      setShowLiabilityModal(false);
+      setSelectedAvailability(null);
+      fetchData();
+      setError("Vehicle booked successfully!");
     } catch (err) {
-      setError(err.response?.data?.detail || "Failed to cancel booking.");
+      setError(err.response?.data?.detail || "Failed to book vehicle.");
+      setShowLiabilityModal(false);
     }
   };
 
-  const handleDeleteRide = async (rideId) => {
-    if (!confirm("Are you sure you want to delete this ride? This action cannot be undone.")) {
+  const handleCancelVehicleBooking = async (bookingId) => {
+    if (!confirm("Are you sure you want to cancel this booking?")) {
       return;
     }
     
     try {
-      await axios.delete(`${API_URL}/api/rides/${rideId}`);
-      fetchData(); // Refresh data
-      setError("Ride deleted successfully!");
+      await axios.delete(`${API_URL}/api/vehicle-booking/${bookingId}`);
+      fetchData();
+      setError("Vehicle booking cancelled successfully!");
     } catch (err) {
-      setError(err.response?.data?.detail || "Failed to delete ride.");
+      setError(err.response?.data?.detail || "Failed to cancel booking.");
     }
   };
 
@@ -236,74 +268,77 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Available Rides Section - uses the /rides endpoint */}
+        {/* Available Vehicles Section */}
         <section className="bg-white p-8 rounded-3xl shadow-xl">
-          <h2 className="text-3xl font-bold text-gray-800 mb-6">Available Rides</h2>
+          <h2 className="text-3xl font-bold text-gray-800 mb-6">Available Vehicles</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {rides.length > 0 ? (
-              rides.map((ride) => (
-                <div key={ride.id} className="bg-gray-50 p-6 rounded-2xl shadow-md border-t-4 border-green-600">
-                  <h3 className="text-xl font-semibold mb-2 text-green-700">{ride.source} → {ride.destination}</h3>
-                  <p className="text-sm text-gray-600 mb-1">Driver: {ride.driver}</p>
-                  <p className="text-sm text-gray-600 mb-1">Departure: {new Date(ride.departure_time).toLocaleString()}</p>
-                  <p className="text-sm text-gray-600 mb-1">Seats: {ride.available_seats}</p>
-                  <p className="text-sm text-gray-600 mb-4">Fare: ₹{parseFloat(ride.fare).toFixed(2)}</p>
+            {availableVehicles.length > 0 ? (
+              availableVehicles.map((availability) => (
+                <div key={availability.id} className="bg-gray-50 p-6 rounded-2xl shadow-md border-t-4 border-green-600">
+                  <h3 className="text-xl font-semibold mb-2 text-green-700">{availability.vehicle_name}</h3>
+                  <p className="text-sm text-gray-600 mb-1">Registration: {availability.vehicle_registration}</p>
+                  <p className="text-sm text-gray-600 mb-1">Pickup: {availability.pickup_point}</p>
+                  <p className="text-sm text-gray-600 mb-1">From: {new Date(availability.available_from).toLocaleString()}</p>
+                  <p className="text-sm text-gray-600 mb-1">To: {new Date(availability.available_to).toLocaleString()}</p>
+                  <p className="text-sm text-gray-600 mb-4">Price: ₹{parseFloat(availability.price_per_hour).toFixed(2)}/hour</p>
                   <button
-                    onClick={() => handleBookRide(ride.id)}
+                    onClick={() => handleBookVehicle(availability)}
                     className="w-full bg-green-600 text-white py-2 rounded-full font-semibold hover:bg-green-700 transition"
                   >
-                    Book Ride
+                    Book Vehicle
                   </button>
                 </div>
               ))
             ) : (
-              <p className="text-gray-500">No available rides at the moment.</p>
+              <p className="text-gray-500">No available vehicles at the moment.</p>
             )}
           </div>
         </section>
 
-        {/* My Rides & Bookings - uses the /my-rides and /my-bookings endpoints */}
+        {/* My Vehicle Availability & Bookings */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* My Rides Section */}
+          {/* My Vehicle Availability Section */}
           <section className="bg-white p-8 rounded-3xl shadow-xl">
-            <h2 className="text-3xl font-bold text-gray-800 mb-6">My Rides (As Driver)</h2>
+            <h2 className="text-3xl font-bold text-gray-800 mb-6">My Vehicle Availability</h2>
             <div className="space-y-4">
-              {myRides.length > 0 ? (
-                myRides.map((ride) => (
-                  <div key={ride.id} className="bg-gray-50 p-6 rounded-2xl shadow-sm border-l-4 border-green-600">
+              {myVehicleAvailability.length > 0 ? (
+                myVehicleAvailability.map((availability) => (
+                  <div key={availability.id} className="bg-gray-50 p-6 rounded-2xl shadow-sm border-l-4 border-green-600">
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-green-700">{ride.source} → {ride.destination}</h3>
-                        <p className="text-sm text-gray-600">Departure: {new Date(ride.departure_time).toLocaleString()}</p>
-                        <p className="text-sm text-gray-600">Fare: ₹{parseFloat(ride.fare).toFixed(2)} | Seats: {ride.available_seats}</p>
+                        <h3 className="text-lg font-semibold text-green-700">{availability.vehicle_name}</h3>
+                        <p className="text-sm text-gray-600">Pickup: {availability.pickup_point}</p>
+                        <p className="text-sm text-gray-600">From: {new Date(availability.available_from).toLocaleString()}</p>
+                        <p className="text-sm text-gray-600">To: {new Date(availability.available_to).toLocaleString()}</p>
+                        <p className="text-sm text-gray-600">Price: ₹{parseFloat(availability.price_per_hour).toFixed(2)}/hour</p>
+                        <p className={`text-sm font-semibold ${availability.is_booked ? 'text-red-600' : 'text-green-600'}`}>
+                          {availability.is_booked ? 'Booked' : 'Available'}
+                        </p>
                       </div>
-                      <button
-                        onClick={() => handleDeleteRide(ride.id)}
-                        className="ml-4 px-3 py-1 bg-red-500 text-white text-sm rounded-full hover:bg-red-600 transition"
-                      >
-                        Delete
-                      </button>
                     </div>
                   </div>
                 ))
               ) : (
-                <p className="text-gray-500">You haven&apos;t created any rides yet.</p>
+                <p className="text-gray-500">You haven&apos;t posted any vehicle availability yet.</p>
               )}
             </div>
           </section>
 
-          {/* My Bookings Section */}
+          {/* My Vehicle Bookings Section */}
           <section className="bg-white p-8 rounded-3xl shadow-xl">
-            <h2 className="text-3xl font-bold text-gray-800 mb-6">My Bookings</h2>
+            <h2 className="text-3xl font-bold text-gray-800 mb-6">My Vehicle Bookings</h2>
             <div className="space-y-4">
-              {myBookings.length > 0 ? (
-                myBookings.map((booking) => (
-                  <div key={booking.booking_id} className="bg-gray-50 p-6 rounded-2xl shadow-sm border-l-4 border-green-600">
-                    <h3 className="text-lg font-semibold text-green-700">{booking.source} → {booking.destination}</h3>
-                    <p className="text-sm text-gray-600">Driver: {booking.driver}</p>
-                    <p className="text-sm text-gray-600 mb-2">Departure: {new Date(booking.departure_time).toLocaleString()}</p>
+              {myVehicleBookings.length > 0 ? (
+                myVehicleBookings.map((booking) => (
+                  <div key={booking.id} className="bg-gray-50 p-6 rounded-2xl shadow-sm border-l-4 border-green-600">
+                    <h3 className="text-lg font-semibold text-green-700">{booking.vehicle_name}</h3>
+                    <p className="text-sm text-gray-600">Pickup: {booking.pickup_point}</p>
+                    <p className="text-sm text-gray-600">From: {new Date(booking.available_from).toLocaleString()}</p>
+                    <p className="text-sm text-gray-600">To: {new Date(booking.available_to).toLocaleString()}</p>
+                    <p className="text-sm text-gray-600">Price: ₹{parseFloat(booking.price_per_hour).toFixed(2)}/hour</p>
+                    <p className="text-sm text-gray-600 mb-2">Booked: {new Date(booking.booked_at).toLocaleString()}</p>
                     <button
-                      onClick={() => handleCancelBooking(booking.booking_id)}
+                      onClick={() => handleCancelVehicleBooking(booking.id)}
                       className="text-sm text-red-600 hover:underline transition"
                     >
                       Cancel Booking
@@ -311,68 +346,131 @@ export default function Dashboard() {
                   </div>
                 ))
               ) : (
-                <p className="text-gray-500">You haven&apos;t booked any rides yet.</p>
+                <p className="text-gray-500">You haven&apos;t booked any vehicles yet.</p>
               )}
             </div>
           </section>
         </div>
         
-        {/* Create a Ride Section - uses the POST /rides endpoint */}
-        <section className="bg-white p-8 rounded-3xl shadow-xl">
-          <h2 className="text-3xl font-bold text-gray-800 mb-6">Create a New Ride</h2>
-          <form onSubmit={handleCreateRide} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <input
-              type="text"
-              name="source"
-              placeholder="Source"
-              value={newRideForm.source}
-              onChange={(e) => setNewRideForm({ ...newRideForm, source: e.target.value })}
-              className="border border-gray-300 rounded-full py-3 px-4 focus:outline-none focus:ring-2 focus:ring-green-500 placeholder-gray-500"
-              required
-            />
-            <input
-              type="text"
-              name="destination"
-              placeholder="Destination"
-              value={newRideForm.destination}
-              onChange={(e) => setNewRideForm({ ...newRideForm, destination: e.target.value })}
-              className="border border-gray-300 rounded-full py-3 px-4 focus:outline-none focus:ring-2 focus:ring-green-500 placeholder-gray-500"
-              required
-            />
-            <input
-              type="datetime-local"
-              name="departure_time"
-              value={newRideForm.departure_time}
-              onChange={(e) => setNewRideForm({ ...newRideForm, departure_time: e.target.value })}
-              className="border border-gray-300 rounded-full py-3 px-4 focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-500"
-              required
-            />
-            <input
-              type="number"
-              name="fare"
-              placeholder="Fare (₹)"
-              value={newRideForm.fare}
-              onChange={(e) => setNewRideForm({ ...newRideForm, fare: e.target.value })}
-              className="border border-gray-300 rounded-full py-3 px-4 focus:outline-none focus:ring-2 focus:ring-green-500 placeholder-gray-500"
-              required
-            />
-            <input
-              type="number"
-              name="available_seats"
-              placeholder="Available Seats"
-              value={newRideForm.available_seats}
-              onChange={(e) => setNewRideForm({ ...newRideForm, available_seats: e.target.value })}
-              className="border border-gray-300 rounded-full py-3 px-4 focus:outline-none focus:ring-2 focus:ring-green-500 placeholder-gray-500"
-              required
-            />
-            <button
-              type="submit"
-              className="w-full bg-green-600 text-white py-3 rounded-full font-semibold shadow hover:bg-green-700 transition"
-            >
-              Create Ride
-            </button>
-          </form>
-        </section>
+        {/* Create Vehicle and Post Availability Sections */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+          {/* Create Vehicle Section */}
+          <section className="bg-white p-8 rounded-3xl shadow-xl">
+            <h2 className="text-3xl font-bold text-gray-800 mb-6">Add New Vehicle</h2>
+            <form onSubmit={handleCreateVehicle} className="space-y-4">
+              <input
+                type="text"
+                name="name"
+                placeholder="Vehicle Name (e.g., Honda City)"
+                value={newVehicleForm.name}
+                onChange={(e) => setNewVehicleForm({ ...newVehicleForm, name: e.target.value })}
+                className="w-full border border-gray-300 rounded-full py-3 px-4 focus:outline-none focus:ring-2 focus:ring-green-500 placeholder-gray-500"
+                required
+              />
+              <input
+                type="text"
+                name="registration_number"
+                placeholder="Registration Number"
+                value={newVehicleForm.registration_number}
+                onChange={(e) => setNewVehicleForm({ ...newVehicleForm, registration_number: e.target.value })}
+                className="w-full border border-gray-300 rounded-full py-3 px-4 focus:outline-none focus:ring-2 focus:ring-green-500 placeholder-gray-500"
+                required
+              />
+              <input
+                type="number"
+                name="price_per_hour"
+                placeholder="Default Price per Hour (₹)"
+                value={newVehicleForm.price_per_hour}
+                onChange={(e) => setNewVehicleForm({ ...newVehicleForm, price_per_hour: e.target.value })}
+                className="w-full border border-gray-300 rounded-full py-3 px-4 focus:outline-none focus:ring-2 focus:ring-green-500 placeholder-gray-500"
+                required
+              />
+              <input
+                type="datetime-local"
+                name="available_from"
+                value={newVehicleForm.available_from}
+                onChange={(e) => setNewVehicleForm({ ...newVehicleForm, available_from: e.target.value })}
+                className="w-full border border-gray-300 rounded-full py-3 px-4 focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-500"
+                required
+              />
+              <input
+                type="datetime-local"
+                name="available_to"
+                value={newVehicleForm.available_to}
+                onChange={(e) => setNewVehicleForm({ ...newVehicleForm, available_to: e.target.value })}
+                className="w-full border border-gray-300 rounded-full py-3 px-4 focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-500"
+                required
+              />
+              <button
+                type="submit"
+                className="w-full bg-green-600 text-white py-3 rounded-full font-semibold shadow hover:bg-green-700 transition"
+              >
+                Add Vehicle
+              </button>
+            </form>
+          </section>
+
+          {/* Post Vehicle Availability Section */}
+          <section className="bg-white p-8 rounded-3xl shadow-xl">
+            <h2 className="text-3xl font-bold text-gray-800 mb-6">Post Vehicle Availability</h2>
+            <form onSubmit={handleCreateAvailability} className="space-y-4">
+              <select
+                name="vehicle_id"
+                value={newAvailabilityForm.vehicle_id}
+                onChange={(e) => setNewAvailabilityForm({ ...newAvailabilityForm, vehicle_id: e.target.value })}
+                className="w-full border border-gray-300 rounded-full py-3 px-4 focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-500"
+                required
+              >
+                <option value="">Select Vehicle</option>
+                {vehicles.map((vehicle) => (
+                  <option key={vehicle.id} value={vehicle.id}>
+                    {vehicle.name} - {vehicle.registration_number}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                name="pickup_point"
+                placeholder="Pickup Point"
+                value={newAvailabilityForm.pickup_point}
+                onChange={(e) => setNewAvailabilityForm({ ...newAvailabilityForm, pickup_point: e.target.value })}
+                className="w-full border border-gray-300 rounded-full py-3 px-4 focus:outline-none focus:ring-2 focus:ring-green-500 placeholder-gray-500"
+                required
+              />
+              <input
+                type="datetime-local"
+                name="available_from"
+                value={newAvailabilityForm.available_from}
+                onChange={(e) => setNewAvailabilityForm({ ...newAvailabilityForm, available_from: e.target.value })}
+                className="w-full border border-gray-300 rounded-full py-3 px-4 focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-500"
+                required
+              />
+              <input
+                type="datetime-local"
+                name="available_to"
+                value={newAvailabilityForm.available_to}
+                onChange={(e) => setNewAvailabilityForm({ ...newAvailabilityForm, available_to: e.target.value })}
+                className="w-full border border-gray-300 rounded-full py-3 px-4 focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-500"
+                required
+              />
+              <input
+                type="number"
+                name="price_per_hour"
+                placeholder="Price per Hour (₹)"
+                value={newAvailabilityForm.price_per_hour}
+                onChange={(e) => setNewAvailabilityForm({ ...newAvailabilityForm, price_per_hour: e.target.value })}
+                className="w-full border border-gray-300 rounded-full py-3 px-4 focus:outline-none focus:ring-2 focus:ring-green-500 placeholder-gray-500"
+                required
+              />
+              <button
+                type="submit"
+                className="w-full bg-blue-600 text-white py-3 rounded-full font-semibold shadow hover:bg-blue-700 transition"
+              >
+                Post Availability
+              </button>
+            </form>
+          </section>
+        </div>
 
         {/* Chatbot and OBD Sections - using the /chatbot and /obd/mock endpoints */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
@@ -418,7 +516,7 @@ export default function Dashboard() {
             {/* OBD Mock Data Section */}
             <section className="bg-white p-8 rounded-3xl shadow-xl flex flex-col justify-between">
                 <div>
-                    <h2 className="text-3xl font-bold text-gray-800 mb-6">OBD Mock Data</h2>
+                    <h2 className="text-3xl font-bold text-gray-800 mb-6">OBD  Data</h2>
                     <p className="text-gray-600 mb-4">
                         Simulate real-time data from a vehicle&apos;s On-Board Diagnostics system.
                         <br />
@@ -525,6 +623,80 @@ export default function Dashboard() {
           </section>
         )}
       </main>
+
+      {/* Liability Agreement Modal */}
+      {showLiabilityModal && selectedAvailability && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-8">
+              <h2 className="text-3xl font-bold text-gray-800 mb-6 text-center">
+                Liability & Usage Agreement
+              </h2>
+              <div className="text-center mb-6">
+                <h3 className="text-xl font-semibold text-green-700">
+                  {selectedAvailability.vehicle_name}
+                </h3>
+                <p className="text-gray-600">
+                  Pickup: {selectedAvailability.pickup_point}
+                </p>
+                <p className="text-gray-600">
+                  Duration: {new Date(selectedAvailability.available_from).toLocaleString()} - {new Date(selectedAvailability.available_to).toLocaleString()}
+                </p>
+                <p className="text-gray-600 font-semibold">
+                  Price: ₹{parseFloat(selectedAvailability.price_per_hour).toFixed(2)}/hour
+                </p>
+              </div>
+              
+              <div className="bg-gray-50 p-6 rounded-2xl mb-6 text-sm text-gray-700 leading-relaxed">
+                <h4 className="font-bold text-lg mb-4 text-gray-800">UniPool Liability Agreement</h4>
+                <p className="mb-4">
+                  By booking a ride through UniPool, you agree to the following:
+                </p>
+                
+                <div className="space-y-4">
+                  <div>
+                    <h5 className="font-semibold text-gray-800 mb-2">Responsibility for Damages:</h5>
+                    <p>You are solely responsible for any damage caused to the vehicle during your ride. You agree to bear all repair or replacement costs arising from such damages.</p>
+                  </div>
+                  
+                  <div>
+                    <h5 className="font-semibold text-gray-800 mb-2">Prohibited Activities:</h5>
+                    <p>You must not tamper with, misuse, or interfere with any vehicle parts or installed devices. This includes, but is not limited to, attempts to disable or manipulate the On-Board Diagnostics (OBD) tracker.</p>
+                  </div>
+                  
+                  <div>
+                    <h5 className="font-semibold text-gray-800 mb-2">Monitoring & Accountability:</h5>
+                    <p>The vehicle is monitored through the OBD tracker for safety and security. Any unfair, illegal, or suspicious activity will be logged, and you may face penalties or legal action.</p>
+                  </div>
+                  
+                  <div>
+                    <h5 className="font-semibold text-gray-800 mb-2">Acceptance of Terms:</h5>
+                    <p>By clicking "I Agree" and proceeding with your booking, you acknowledge that you have read, understood, and accepted these terms. If you do not agree, you cannot book a ride through UniPool.</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex space-x-4">
+                <button
+                  onClick={() => {
+                    setShowLiabilityModal(false);
+                    setSelectedAvailability(null);
+                  }}
+                  className="flex-1 bg-gray-500 text-white py-3 rounded-full font-semibold hover:bg-gray-600 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAcceptLiability}
+                  className="flex-1 bg-green-600 text-white py-3 rounded-full font-semibold hover:bg-green-700 transition"
+                >
+                  I Agree & Book Vehicle
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
